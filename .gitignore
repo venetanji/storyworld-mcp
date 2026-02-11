@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+.env
+.env.*
+
+# Byte-compiled / distribution
+build/
+dist/
+*.egg-info/
+
+# Editor
+.vscode/
+.idea/
+
+# Data
+characters/
+images/
+.cache/
+.DS_Store
+
+# OS
+Thumbs.db
+
+# node (if added later)
+node_modules/

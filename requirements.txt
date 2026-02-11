@@ -1,0 +1,8 @@
+pydantic
+PyYAML
+httpx
+huggingface-hub
+pytest
+pytest-asyncio
+fastmcp>=2.0
+python-dotenv

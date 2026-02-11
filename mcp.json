@@ -1,0 +1,15 @@
+{
+  "id": "storyworld-mcp",
+  "name": "Storyworld MCP (FastMCP)",
+  "description": "Provide character contexts and assets for agent impersonation.",
+  "version": "0.2.0",
+  "url": "http://localhost:3333",
+  "repository": "https://github.com/<owner>/storyworld-mcp",
+  "maintainer": "your-name <you@example.com>",
+  "protocol": "mcp",
+  "entrypoint": {
+    "type": "mcp",
+    "host": "localhost",
+    "port": 3334
+  }
+}

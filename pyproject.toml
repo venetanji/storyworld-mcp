@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "storyworld-mcp"
+version = "0.2.0"
+description = "FastMCP server providing character contexts and assets for agent impersonation"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [ {name = "Your Name", email = "you@example.com"} ]
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp==3.0.0b2",
+    "pydantic",
+    "PyYAML",
+    "httpx",
+    "huggingface-hub",
+    "python-dotenv",
+]
+
+[project.scripts]
+storyworld-mcp = "mcp_server.mcp_app:main"
