@@ -248,7 +248,7 @@ def list_character_images(code: str) -> list:
     blocks automatically when returned as a list.
     """
     images_folder = config.CHARACTERS_IMAGE_DIR / code
-    imgs = []
+    imgs: list[dict] = []
     if not images_folder.exists() or not images_folder.is_dir():
         return imgs
     for p in sorted(images_folder.iterdir()):
@@ -257,7 +257,10 @@ def list_character_images(code: str) -> list:
         if p.suffix.lower() not in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"):
             continue
         try:
-            imgs.append(Image(path=p))
+            # Ensure a public copy exists and return a structured entry so
+            # outputSchema validation can succeed for tool clients.
+            public_path = _copy_to_public_dir(p, code)
+            imgs.append({"name": p.name, "path": str(public_path), "image": Image(path=public_path)})
         except Exception:
             continue
     return imgs
@@ -360,14 +363,13 @@ def character_profile_image(code: str) -> ResourceResult:
         return ResourceResult(contents=[])
 
     mime = mimetypes.guess_type(selected_path.name)[0] or "application/octet-stream"
-    # Return the raw file bytes as ResourceContent so tooling/transport can
-    # deliver binary image data instead of a JSON-serialized FileResource.
     try:
-        data = selected_path.read_bytes()
-        wrapped = ResourceContent(data, mime_type=mime, name=selected_path.name)
+        # Ensure public copy exists and return a FileResource referencing it
+        public_path = _copy_to_public_dir(selected_path, code)
+        file_res = FileResource(path=str(public_path.absolute()), is_binary=True, mime_type=mime, uri=public_path.absolute().as_uri())
+        wrapped = ResourceContent(file_res, mime_type=mime)
         return ResourceResult(contents=[wrapped])
     except Exception:
-        # Fallback to empty result on any read error
         return ResourceResult(contents=[])
 
 
