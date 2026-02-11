@@ -19,6 +19,9 @@ import argparse
 import sys
 from . import downloader, config
 from fastmcp.utilities.types import Image
+from fastmcp.server.context import Context
+import asyncio
+from huggingface_hub import snapshot_download
 import mimetypes
 import os
 import shutil
@@ -114,8 +117,8 @@ def list_characters() -> dict:
     return {"count": len(entries), "characters": sorted(entries, key=lambda e: (e.get("name") or "").lower())}
 
 
-@mcp.tool
-def get_character_context(code: str) -> list[dict]:
+@mcp.tool(task=True)
+async def get_character_context(code: str, ctx: Context) -> list[dict]:
     """Return the MCP-style context for a single character.
 
     This returns a dict: {id,type,content}. `content` contains top-level YAML
@@ -168,6 +171,56 @@ def get_character_context(code: str) -> list[dict]:
 
     if not selected_path and images_list:
         selected_path = images_list[0]
+
+    # If we don't have any images locally, download images for this character on demand.
+    if not images_list:
+        hf_dataset = config.HF_IMAGES_DATASET
+        cache_dir = Path('.cache') / 'hf-datasets'
+        try:
+            # Snapshot the HF dataset in a thread
+            snapshot_dir = await asyncio.to_thread(snapshot_download, repo_type='dataset', repo_id=hf_dataset, cache_dir=str(cache_dir))
+            src = Path(snapshot_dir)
+            exts = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')
+            matches = []
+            for p in src.rglob('*'):
+                if not p.is_file():
+                    continue
+                if p.suffix.lower() not in exts:
+                    continue
+                try:
+                    rel = p.relative_to(src)
+                except Exception:
+                    continue
+                # Only copy files that are in a folder matching the character code
+                if len(rel.parts) > 0 and rel.parts[0] == code:
+                    matches.append((p, rel))
+
+            total = len(matches)
+            if total:
+                for idx, (p, rel) in enumerate(matches, start=1):
+                    dest = config.CHARACTERS_IMAGE_DIR / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    # copy in thread to avoid blocking event loop
+                    await asyncio.to_thread(shutil.copy2, p, dest)
+                    # report progress to client (progress, total, message)
+                    try:
+                        await ctx.report_progress(idx, total, f"Downloading {rel}")
+                    except Exception:
+                        pass
+
+                # rebuild images_list after download
+                images_list = []
+                if images_folder.exists() and images_folder.is_dir():
+                    for p in sorted(images_folder.iterdir()):
+                        if not p.is_file():
+                            continue
+                        if p.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'):
+                            continue
+                        images_list.append(p)
+                if not selected_path and images_list:
+                    selected_path = images_list[0]
+        except Exception as ex:
+            LOG.warning('On-demand image download failed: %s', ex)
 
     embedded = []
     if selected_path and selected_path.exists():
