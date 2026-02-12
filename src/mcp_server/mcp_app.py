@@ -12,6 +12,10 @@ Tools:
 - fetch_characters(...) -> trigger downloader
 """
 from fastmcp import FastMCP
+from fastmcp.tools.tool import ToolResult
+from mcp.types import TextContent
+
+
 import logging
 from pathlib import Path
 import yaml
@@ -29,6 +33,7 @@ from urllib.parse import urlparse
 from fastmcp.resources import ResourceResult, ResourceContent, FileResource
 from fastmcp.server.transforms import ResourcesAsTools
 import json
+import requests
 
 LOG = logging.getLogger(__name__)
 
@@ -221,6 +226,79 @@ async def get_character_context(code: str, ctx: Context) -> list[dict]:
                     selected_path = images_list[0]
         except Exception as ex:
             LOG.warning('On-demand image download failed: %s', ex)
+    return [content] + ([Image(path=_copy_to_public_dir(selected_path, code)).to_image_content()] if selected_path else [])
+
+
+@mcp.tool(task=True)
+async def refresh_character(code: str, ctx: Context) -> dict:
+    """Fetch latest YAML for `code` from GitHub and download images for that code from HF dataset.
+
+    This runs as a background task and reports progress via `ctx.report_progress`.
+    Returns a summary dict: {"yaml_updated": bool, "images_copied": int}
+    """
+    result = {"yaml_updated": False, "images_copied": 0}
+
+    # 1) Fetch YAML from GitHub
+    try:
+        repo = config.GITHUB_CHARACTERS_REPO
+        path = config.GITHUB_CHARACTERS_PATH.strip("/")
+        owner, name = repo.split("/")
+        filename = f"{code}.yaml"
+        api_url = f"https://api.github.com/repos/{owner}/{name}/contents/{path}/{filename}"
+        resp = requests.get(api_url, timeout=30)
+        if resp.status_code == 200:
+            meta = resp.json()
+            download_url = meta.get("download_url")
+            if download_url:
+                raw = requests.get(download_url, timeout=30)
+                raw.raise_for_status()
+                dest = config.CHARACTERS_DESC_DIR / filename
+                dest.write_bytes(raw.content)
+                result["yaml_updated"] = True
+        else:
+            LOG.info("No remote YAML for %s (status %s)", code, resp.status_code)
+    except Exception as e:
+        LOG.warning("Failed to refresh YAML for %s: %s", code, e)
+
+    # 2) Snapshot HF dataset and copy files for this code
+    hf_dataset = config.HF_IMAGES_DATASET
+    cache_dir = Path('.cache') / 'hf-datasets'
+    try:
+        snapshot_dir = await asyncio.to_thread(snapshot_download, repo_type='dataset', repo_id=hf_dataset, cache_dir=str(cache_dir))
+        src = Path(snapshot_dir)
+        exts = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')
+        matches = []
+        for p in src.rglob('*'):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in exts:
+                continue
+            try:
+                rel = p.relative_to(src)
+            except Exception:
+                continue
+            if len(rel.parts) > 0 and rel.parts[0] == code:
+                matches.append((p, rel))
+
+        total = len(matches)
+        copied = 0
+        if total:
+            for idx, (p, rel) in enumerate(matches, start=1):
+                dest = config.CHARACTERS_IMAGE_DIR / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                await asyncio.to_thread(shutil.copy2, p, dest)
+                copied += 1
+                # report progress
+                try:
+                    await ctx.report_progress(copied, total, f"Copying {rel.name}")
+                except Exception:
+                    pass
+
+        result["images_copied"] = copied
+    except Exception as e:
+        LOG.warning("Failed to refresh images for %s: %s", code, e)
+
+    return result
 
     embedded = []
     if selected_path and selected_path.exists():
@@ -241,7 +319,7 @@ async def get_character_context(code: str, ctx: Context) -> list[dict]:
 
 
 @mcp.tool
-def list_character_images(code: str) -> list:
+def list_character_images(code: str) -> dict:
     """Return Image helper objects for files in characters/images/<code>/.
 
     Returning `Image` objects lets FastMCP convert them to MCP image content
@@ -260,10 +338,13 @@ def list_character_images(code: str) -> list:
             # Ensure a public copy exists and return a structured entry so
             # outputSchema validation can succeed for tool clients.
             public_path = _copy_to_public_dir(p, code)
-            imgs.append({"name": p.name, "path": str(public_path), "image": Image(path=public_path)})
+            imgs.append({"name": p.name, "path": str(public_path)})
         except Exception:
             continue
-    return imgs
+    
+    return ToolResult(
+        structured_content={"images": imgs}
+    )
 
 
 @mcp.tool
