@@ -17,6 +17,7 @@ dependencies = [
     "httpx",
     "huggingface-hub",
     "python-dotenv",
+    "requests"
 ]
 
 [project.scripts]
