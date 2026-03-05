@@ -2,8 +2,13 @@ services:
   tailscale-serve:
     image: tailscale/tailscale:latest
     hostname: polyu-storyworld
+    dns:
+      - 100.100.100.100
+      - 1.1.1.1
+    dns_search:
+      - tail9683c.ts.net
     ports:
-      - "3333:3333"
+      - "3334:3334"
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_EXTRA_ARGS=--advertise-tags=tag:container
@@ -28,8 +33,16 @@ services:
     volumes:
       - characters:/app/characters
       - hf-cache:/root/.cache/huggingface
+      - ./tools:/app/tools
+      - ${COMFY_OUTPUT_DIR_HOST:-./comfy-output}:/app/comfy-output
+      - ${STORIES_DIR_HOST:-./stories}:/app/stories
     environment:
       - PYTHONPATH=/app/src
+      - HF_HOME=/root/.cache/huggingface
+      - HF_TOKEN=${HF_TOKEN}
+      - FASTMCP_TOOLS_RELOAD=${FASTMCP_TOOLS_RELOAD:-0}
+      - COMFY_OUTPUT_DIR=/app/comfy-output
+      - STORIES_DIR=/app/stories
 
 volumes:
   hf-cache:
