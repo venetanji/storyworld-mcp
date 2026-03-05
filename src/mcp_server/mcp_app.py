@@ -244,6 +244,19 @@ async def _call_comfy_tool(name: str, payload: dict) -> dict:
         return {"ok": False, "tool": name, "error": str(ex)}
 
 
+async def _list_comfy_tools() -> dict:
+    transport = _comfy_transport()
+    if transport is None:
+        return {"ok": False, "error": "No comfy transport configured", "tools": []}
+    try:
+        async with Client(transport) as c:
+            tools = await asyncio.wait_for(c.list_tools(), timeout=max(15.0, config.COMFY_TOOL_TIMEOUT_SECONDS / 3))
+            names = [getattr(t, "name", "") for t in tools]
+            return {"ok": True, "count": len(names), "tools": names}
+    except Exception as ex:
+        return {"ok": False, "error": str(ex), "tools": []}
+
+
 def _download_yaml_for_code(code: str) -> Path | None:
     repo = config.GITHUB_CHARACTERS_REPO
     path = config.GITHUB_CHARACTERS_PATH.strip("/")
@@ -846,6 +859,12 @@ async def comfy_generate_image(prompt: str) -> dict:
 
 
 @mcp.tool
+async def comfy_list_tools() -> dict:
+    """Return tool names currently exposed by the downstream comfy MCP."""
+    return await _list_comfy_tools()
+
+
+@mcp.tool
 async def comfy_flux2_text_to_image(prompt: str, output_filename_prefix: str, width: int, height: int) -> dict:
     return await _call_comfy_tool(
         "flux2_text_to_image",
@@ -854,6 +873,17 @@ async def comfy_flux2_text_to_image(prompt: str, output_filename_prefix: str, wi
             "output_filename_prefix": output_filename_prefix,
             "width": width,
             "height": height,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_flux2_klein_multiple_angles(image_filename: str, output_filename_prefix: str) -> dict:
+    return await _call_comfy_tool(
+        "flux2_klein_multiple_angles",
+        {
+            "image_filename": image_filename,
+            "output_filename_prefix": output_filename_prefix,
         },
     )
 

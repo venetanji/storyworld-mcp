@@ -64,6 +64,17 @@ FASTMCP_TOOLS_RELOAD=1 python -m mcp_server.mcp_app --transport http --host 0.0.
 - `init_story_repo(story_id, github_repo?)` — initializes local git repo for a story and optional origin
 - `commit_story_repo(story_id, message?)` — syncs story bundle and commits changes
 - `push_story_repo(story_id, github_repo?, branch?)` — pushes to GitHub using `GITHUB_TOKEN`/`GH_TOKEN`
+- `comfy_list_tools()` — returns available downstream comfy tools (for diagnostics)
+- Wrapped comfy generation tools:
+  - `comfy_generate_image`
+  - `comfy_flux2_text_to_image`
+  - `comfy_flux2_klein_multiple_angles`
+  - `comfy_flux2_single_image_edit`
+  - `comfy_flux2_double_image_edit`
+  - `comfy_ltx2_singlepass_t2v`
+  - `comfy_ltx2_singlepass_i2v`
+  - `comfy_qwentts_voice`
+  - `comfy_generate_song`
 
 Clients can connect directly to the FastMCP endpoint.
 
