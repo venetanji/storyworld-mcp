@@ -64,23 +64,10 @@ FASTMCP_TOOLS_RELOAD=1 python -m mcp_server.mcp_app --transport http --host 0.0.
 - `init_story_repo(story_id, github_repo?)` — initializes local git repo for a story and optional origin
 - `commit_story_repo(story_id, message?)` — syncs story bundle and commits changes
 - `push_story_repo(story_id, github_repo?, branch?)` — pushes to GitHub using `GITHUB_TOKEN`/`GH_TOKEN`
-- `comfy_list_tools()` — returns available downstream comfy tools (for diagnostics)
-- Wrapped comfy generation tools:
-  - `comfy_generate_image`
-  - `comfy_flux2_text_to_image`
-  - `comfy_flux2_klein_multiple_angles`
-  - `comfy_flux2_single_image_edit`
-  - `comfy_flux2_double_image_edit`
-  - `comfy_ltx2_singlepass_t2v`
-  - `comfy_ltx2_singlepass_i2v`
-  - `comfy_qwentts_voice`
-  - `comfy_generate_song`
 
 Clients can connect directly to the FastMCP endpoint.
 
 ### Optional provider composition
-- Default mode is `COMFY_MOUNT_MODE=wrapped` (recommended): Storyworld exposes local comfy wrapper tools and calls comfy on tool execution. This keeps `list_tools` fast in LM Studio/Inspector.
-- Optional `COMFY_MOUNT_MODE=mount`: mount the entire comfy MCP namespace directly (can make `list_tools` slower if downstream startup/discovery is slow).
 - `http` mode (public instance): comfy proxy is disabled by default.
 - Set `COMFY_PROXY_IN_HTTP=1` to enable comfy proxy also in `http` mode.
 - `stdio` mode (lab/client mode): comfy proxy can be sourced from either:

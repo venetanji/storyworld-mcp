@@ -39,8 +39,6 @@ COMFY_MCP_AUTO_SPAWN = os.getenv("COMFY_MCP_AUTO_SPAWN", "1") in ("1", "true", "
 COMFY_MCP_SERVER_SPEC = os.getenv("COMFY_MCP_SERVER_SPEC", "git+https://github.com/venetanji/comfyui-mcp-server.git").strip()
 COMFY_MCP_SERVER_ENTRYPOINT = os.getenv("COMFY_MCP_SERVER_ENTRYPOINT", "comfyui-mcp-server").strip()
 COMFY_MCP_SERVER_EXTRA_ARGS = os.getenv("COMFY_MCP_SERVER_EXTRA_ARGS", "").strip()
-COMFY_MOUNT_MODE = os.getenv("COMFY_MOUNT_MODE", "wrapped").strip().lower()
-COMFY_TOOL_TIMEOUT_SECONDS = float(os.getenv("COMFY_TOOL_TIMEOUT_SECONDS", "180"))
 FASTMCP_SHOW_BANNER = os.getenv("FASTMCP_SHOW_BANNER", "0") in ("1", "true", "True")
 FASTMCP_LOG_LEVEL = os.getenv("FASTMCP_LOG_LEVEL", "WARNING").strip()
 
