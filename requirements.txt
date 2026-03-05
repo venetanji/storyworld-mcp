@@ -1,8 +1,9 @@
 pydantic
 PyYAML
 httpx
+requests
 huggingface-hub
 pytest
 pytest-asyncio
-fastmcp>=2.0
+fastmcp[tasks]>=3.1.0,<4.0.0
 python-dotenv

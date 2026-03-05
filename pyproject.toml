@@ -11,10 +11,11 @@ license = {text = "MIT"}
 authors = [ {name = "Your Name", email = "you@example.com"} ]
 requires-python = ">=3.11"
 dependencies = [
-    "fastmcp[tasks]==3.0.0b2",
+    "fastmcp[tasks]>=3.1.0,<4.0.0",
     "pydantic",
     "PyYAML",
     "httpx",
+    "requests",
     "huggingface-hub",
     "python-dotenv",
     "requests"

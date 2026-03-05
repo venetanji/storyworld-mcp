@@ -1,11 +1,12 @@
 # storyworld-mcp — FastMCP compatible MCP server
 
-Lightweight MCP server that provides character contexts and assets for agent impersonation. This repository is now FastMCP-ready (MCP tools + HTTP compatibility).
+Lightweight MCP server that provides character contexts and assets for agent impersonation. The server uses FastMCP v3 patterns (lifespan startup, resources-as-tools transform, and optional file-based dynamic tools).
 
 ## What this repo contains ✅
 - FastMCP tools that expose character contexts and asset-download tooling
 - Downloader that fetches character YAMLs from GitHub and images from Hugging Face
-- (optional) HTTP convenience layer was removed in this iteration; use MCP tools directly
+- FastMCP v3 lifecycle startup for first-run asset bootstrap
+- Optional `tools/` provider for drop-in extra tools during development
 - Example character and images for local development
 - Tests, Dockerfile, and GitHub Actions CI
 
@@ -25,25 +26,76 @@ cp .env.example .env
 # edit .env to set HF dataset or GitHub repo overrides
 ```
 
-3) Run the HTTP server (provides health + character endpoints):
+Recommended `.env` additions for your lab/local flow:
 
 ```bash
-uvicorn mcp_server.main:app --reload --host 0.0.0.0 --port ${PORT:-3333}
+WORKSPACE_DIR=/path/to/storyworld-workspace
+COMFYUI_URL=http://127.0.0.1:8188
+COMFY_OUTPUT_DIR=/path/to/storyworld-workspace/comfy-output
+STORIES_DIR=/path/to/storyworld-workspace/stories
 ```
 
-4) Run the FastMCP server (MCP protocol) for MCP clients:
+3) Run the FastMCP server (MCP protocol) for MCP clients:
 
 ```bash
 # runs FastMCP on port 3334 by default
 python -m mcp_server.mcp_app
 ```
 
+4) Optional: enable auto-reload for Python tools dropped into `./tools`:
+
+```bash
+FASTMCP_TOOLS_RELOAD=1 python -m mcp_server.mcp_app --transport http --host 0.0.0.0 --port 3334
+```
+
 ## FastMCP tools (examples) 💡
 - `list_characters()` — returns available character codes
 - `get_character_context(code)` — returns an MCP-style context payload for a given character
-- `fetch_characters(github_repo, github_path, hf_dataset)` — trigger remote download
+- `get_character_context_compact(code)` — returns profile + media references only (no embedded image binary)
+- `get_character_media_manifest(code)` — returns local/public media manifest with file metadata
+- `refresh_character(code)` — refresh YAML and image assets for one character
+- `get_runtime_capabilities()` — returns active runtime dirs/flags (`COMFY_OUTPUT_DIR`, `STORIES_DIR`, proxy status)
+- `ingest_comfy_outputs(code, story_id?, limit?, mode?)` — ingests recent media from local Comfy output folder
+- `build_story_page(story_id, title?, character_codes?, notes?)` — writes static `stories/<story_id>/index.html` + `story.json`
+- `list_stories()` — lists story bundles under `STORIES_DIR`
+- `init_story_repo(story_id, github_repo?)` — initializes local git repo for a story and optional origin
+- `commit_story_repo(story_id, message?)` — syncs story bundle and commits changes
+- `push_story_repo(story_id, github_repo?, branch?)` — pushes to GitHub using `GITHUB_TOKEN`/`GH_TOKEN`
 
-Clients can use the provided `mcp.json` (dev) or connect to the FastMCP port.
+Clients can connect directly to the FastMCP endpoint.
+
+### Optional provider composition
+- `http` mode (public instance): comfy proxy is disabled by default.
+- Set `COMFY_PROXY_IN_HTTP=1` to enable comfy proxy also in `http` mode.
+- `stdio` mode (lab/client mode): comfy proxy can be sourced from either:
+  - `COMFY_MCP_URL` (remote/local HTTP MCP endpoint), or
+  - `COMFY_MCP_STDIO_COMMAND` + `COMFY_MCP_STDIO_ARGS` (spawn local comfyui-mcp process).
+
+## Lab-friendly local setup 🧪
+For student lab machines, run ComfyUI + Comfy MCP locally and keep this server local as well.
+
+- Set `COMFY_OUTPUT_DIR` to the folder where Comfy writes generated files.
+- Set `STORIES_DIR` to a writable folder for static story bundles.
+- `WORKSPACE_DIR` can be used as a single root folder that contains everything:
+  - `characters/` (downloaded profiles + images)
+  - `comfy-output/` (generated media to ingest)
+  - `stories/` (story bundles + html output)
+- Optional story repo config:
+  - `STORY_REPOS_DIR` local repos root
+  - `STORY_GITHUB_REPO` default `owner/repo` for pushes
+  - `GITHUB_TOKEN` or `GH_TOKEN` for authenticated GitHub API/push operations
+- Students can call generation tools (their local Comfy MCP), then call:
+  1. `ingest_comfy_outputs(code=..., story_id=...)`
+  2. `build_story_page(story_id=..., character_codes=[...])`
+  3. `init_story_repo(...)`, `commit_story_repo(...)`, `push_story_repo(...)` when they want git-backed story publishing
+- Publish `stories/<story_id>/` directly to GitHub Pages (or copy into a story repo and commit).
+
+## Startup & On-Demand Loading ⚡
+- Startup prefetch is opt-in (`STARTUP_PREFETCH=1`).
+- Keep `DISABLE_AUTO_DOWNLOAD=1` to force pure on-demand behavior.
+- Character YAML is fetched from GitHub when first requested if missing locally.
+- Character images are fetched from Hugging Face on demand by character code, using partial dataset download patterns instead of full snapshot.
+- This keeps MCP startup fast and avoids early timeout pressure in stdio/http clients.
 
 ## Data sources & overrides 🔁
 Defaults (override with env vars or `.env`):
