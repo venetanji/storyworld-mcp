@@ -1372,15 +1372,27 @@ def main(argv: list[str] | None = None) -> None:
     _configure_comfy_proxy(transport)
 
     if transport == "stdio":
-        mcp.run()
+        mcp.run(show_banner=config.FASTMCP_SHOW_BANNER, log_level=config.FASTMCP_LOG_LEVEL)
         return
 
     host = ns.host or "127.0.0.1"
     port = ns.port or 3334
     if transport == "http":
-        mcp.run(transport="http", host=host, port=port)
+        mcp.run(
+            transport="http",
+            host=host,
+            port=port,
+            show_banner=config.FASTMCP_SHOW_BANNER,
+            log_level=config.FASTMCP_LOG_LEVEL,
+        )
     elif transport == "sse":
-        mcp.run(transport="sse", host=host, port=port)
+        mcp.run(
+            transport="sse",
+            host=host,
+            port=port,
+            show_banner=config.FASTMCP_SHOW_BANNER,
+            log_level=config.FASTMCP_LOG_LEVEL,
+        )
 
 
 if __name__ == "__main__":

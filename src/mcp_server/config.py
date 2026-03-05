@@ -41,6 +41,8 @@ COMFY_MCP_SERVER_ENTRYPOINT = os.getenv("COMFY_MCP_SERVER_ENTRYPOINT", "comfyui-
 COMFY_MCP_SERVER_EXTRA_ARGS = os.getenv("COMFY_MCP_SERVER_EXTRA_ARGS", "").strip()
 COMFY_MOUNT_MODE = os.getenv("COMFY_MOUNT_MODE", "wrapped").strip().lower()
 COMFY_TOOL_TIMEOUT_SECONDS = float(os.getenv("COMFY_TOOL_TIMEOUT_SECONDS", "180"))
+FASTMCP_SHOW_BANNER = os.getenv("FASTMCP_SHOW_BANNER", "0") in ("1", "true", "True")
+FASTMCP_LOG_LEVEL = os.getenv("FASTMCP_LOG_LEVEL", "WARNING").strip()
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip() or os.getenv("GH_TOKEN", "").strip()
 STORY_GITHUB_REPO = os.getenv("STORY_GITHUB_REPO", "").strip()

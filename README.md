@@ -34,6 +34,8 @@ COMFYUI_URL=http://127.0.0.1:8188
 COMFY_OUTPUT_DIR=/path/to/storyworld-workspace/comfy-output
 STORIES_DIR=/path/to/storyworld-workspace/stories
 COMFY_MCP_AUTO_SPAWN=1
+FASTMCP_SHOW_BANNER=0
+FASTMCP_LOG_LEVEL=WARNING
 ```
 
 3) Run the FastMCP server (MCP protocol) for MCP clients:
