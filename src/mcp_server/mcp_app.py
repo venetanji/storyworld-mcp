@@ -12,10 +12,8 @@ Tools:
 - list_character_images(code) -> image content list for the character
 """
 from fastmcp import FastMCP
-from fastmcp.client import Client
-from fastmcp.client.transports import StdioTransport
+from fastmcp.server import create_proxy
 from fastmcp.server.providers.filesystem import FileSystemProvider
-from fastmcp.server.providers.proxy import ProxyProvider
 from fastmcp.server.lifespan import lifespan
 
 import importlib.metadata
@@ -135,7 +133,7 @@ mcp.add_provider(
 
 
 def _configure_comfy_proxy(transport: str) -> None:
-    """Attach comfy proxy provider based on runtime transport and env configuration."""
+    """Attach comfy server via mount(create_proxy(...)) based on runtime config."""
     global _comfy_provider_added
     if _comfy_provider_added:
         return
@@ -146,35 +144,51 @@ def _configure_comfy_proxy(transport: str) -> None:
         return
 
     if config.COMFY_MCP_URL:
-        mcp.add_provider(
-            ProxyProvider(lambda: Client(config.COMFY_MCP_URL)),
-            namespace="comfy",
-        )
+        mcp.mount(create_proxy(config.COMFY_MCP_URL), namespace="comfy")
         _comfy_provider_added = True
-        LOG.info("Enabled comfy proxy via COMFY_MCP_URL=%s", config.COMFY_MCP_URL)
+        LOG.info("Mounted comfy proxy via COMFY_MCP_URL=%s", config.COMFY_MCP_URL)
         return
 
     if config.COMFY_MCP_STDIO_COMMAND:
         args = shlex.split(config.COMFY_MCP_STDIO_ARGS) if config.COMFY_MCP_STDIO_ARGS else []
-        env = dict(os.environ)
-        env.update(config.comfy_stdio_env_map())
-        cwd = config.COMFY_MCP_STDIO_CWD or None
-        transport_obj = StdioTransport(
-            command=config.COMFY_MCP_STDIO_COMMAND,
-            args=args,
-            env=env,
-            cwd=cwd,
-        )
-        mcp.add_provider(
-            ProxyProvider(lambda: Client(transport_obj)),
-            namespace="comfy",
-        )
+        server_cfg = {
+            "mcpServers": {
+                "default": {
+                    "command": config.COMFY_MCP_STDIO_COMMAND,
+                    "args": args,
+                }
+            }
+        }
+        env_map = config.comfy_stdio_env_map()
+        if env_map:
+            server_cfg["mcpServers"]["default"]["env"] = env_map
+        if config.COMFY_MCP_STDIO_CWD:
+            server_cfg["mcpServers"]["default"]["cwd"] = config.COMFY_MCP_STDIO_CWD
+        mcp.mount(create_proxy(server_cfg), namespace="comfy")
         _comfy_provider_added = True
         LOG.info(
-            "Enabled comfy proxy via stdio command: %s %s",
+            "Mounted comfy proxy via stdio command: %s %s",
             config.COMFY_MCP_STDIO_COMMAND,
             " ".join(args),
         )
+        return
+
+    if transport == "stdio" and config.COMFY_MCP_AUTO_SPAWN and config.COMFY_MCP_SERVER_SPEC:
+        args = [
+            "--from",
+            config.COMFY_MCP_SERVER_SPEC,
+            config.COMFY_MCP_SERVER_ENTRYPOINT,
+            "--comfy-url",
+            config.COMFYUI_URL,
+            "--output-folder",
+            str(config.COMFY_OUTPUT_DIR),
+        ]
+        if config.COMFY_MCP_SERVER_EXTRA_ARGS:
+            args.extend(shlex.split(config.COMFY_MCP_SERVER_EXTRA_ARGS))
+        server_cfg = {"mcpServers": {"default": {"command": "uvx", "args": args}}}
+        mcp.mount(create_proxy(server_cfg), namespace="comfy")
+        _comfy_provider_added = True
+        LOG.info("Mounted comfy proxy via uvx auto-spawn: uvx %s", " ".join(args))
 
 
 def _download_yaml_for_code(code: str) -> Path | None:
@@ -645,6 +659,9 @@ def get_runtime_capabilities() -> dict:
         "comfy_mcp_url": config.COMFY_MCP_URL or None,
         "comfyui_url": config.COMFYUI_URL or None,
         "comfy_mcp_stdio_command": config.COMFY_MCP_STDIO_COMMAND or None,
+        "comfy_mcp_auto_spawn": bool(config.COMFY_MCP_AUTO_SPAWN),
+        "comfy_mcp_server_spec": config.COMFY_MCP_SERVER_SPEC or None,
+        "comfy_mcp_server_entrypoint": config.COMFY_MCP_SERVER_ENTRYPOINT or None,
         "comfy_proxy_in_http": bool(config.COMFY_PROXY_IN_HTTP),
         "comfy_output_dir": str(config.COMFY_OUTPUT_DIR),
         "stories_dir": str(config.STORIES_DIR),

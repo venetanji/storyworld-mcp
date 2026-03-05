@@ -33,6 +33,7 @@ WORKSPACE_DIR=/path/to/storyworld-workspace
 COMFYUI_URL=http://127.0.0.1:8188
 COMFY_OUTPUT_DIR=/path/to/storyworld-workspace/comfy-output
 STORIES_DIR=/path/to/storyworld-workspace/stories
+COMFY_MCP_AUTO_SPAWN=1
 ```
 
 3) Run the FastMCP server (MCP protocol) for MCP clients:
@@ -70,6 +71,8 @@ Clients can connect directly to the FastMCP endpoint.
 - `stdio` mode (lab/client mode): comfy proxy can be sourced from either:
   - `COMFY_MCP_URL` (remote/local HTTP MCP endpoint), or
   - `COMFY_MCP_STDIO_COMMAND` + `COMFY_MCP_STDIO_ARGS` (spawn local comfyui-mcp process).
+  - If neither is set, Storyworld auto-spawns comfyui-mcp with:
+    - `uvx --from ${COMFY_MCP_SERVER_SPEC} ${COMFY_MCP_SERVER_ENTRYPOINT} --comfy-url ${COMFYUI_URL} --output-folder ${COMFY_OUTPUT_DIR}`
 
 ## Lab-friendly local setup 🧪
 For student lab machines, run ComfyUI + Comfy MCP locally and keep this server local as well.
