@@ -66,6 +66,8 @@ FASTMCP_TOOLS_RELOAD=1 python -m mcp_server.mcp_app --transport http --host 0.0.
 Clients can connect directly to the FastMCP endpoint.
 
 ### Optional provider composition
+- Default mode is `COMFY_MOUNT_MODE=wrapped` (recommended): Storyworld exposes local comfy wrapper tools and calls comfy on tool execution. This keeps `list_tools` fast in LM Studio/Inspector.
+- Optional `COMFY_MOUNT_MODE=mount`: mount the entire comfy MCP namespace directly (can make `list_tools` slower if downstream startup/discovery is slow).
 - `http` mode (public instance): comfy proxy is disabled by default.
 - Set `COMFY_PROXY_IN_HTTP=1` to enable comfy proxy also in `http` mode.
 - `stdio` mode (lab/client mode): comfy proxy can be sourced from either:

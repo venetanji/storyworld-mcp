@@ -39,6 +39,8 @@ COMFY_MCP_AUTO_SPAWN = os.getenv("COMFY_MCP_AUTO_SPAWN", "1") in ("1", "true", "
 COMFY_MCP_SERVER_SPEC = os.getenv("COMFY_MCP_SERVER_SPEC", "git+https://github.com/venetanji/comfyui-mcp-server.git").strip()
 COMFY_MCP_SERVER_ENTRYPOINT = os.getenv("COMFY_MCP_SERVER_ENTRYPOINT", "comfyui-mcp-server").strip()
 COMFY_MCP_SERVER_EXTRA_ARGS = os.getenv("COMFY_MCP_SERVER_EXTRA_ARGS", "").strip()
+COMFY_MOUNT_MODE = os.getenv("COMFY_MOUNT_MODE", "wrapped").strip().lower()
+COMFY_TOOL_TIMEOUT_SECONDS = float(os.getenv("COMFY_TOOL_TIMEOUT_SECONDS", "180"))
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip() or os.getenv("GH_TOKEN", "").strip()
 STORY_GITHUB_REPO = os.getenv("STORY_GITHUB_REPO", "").strip()

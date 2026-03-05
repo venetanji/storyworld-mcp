@@ -12,6 +12,8 @@ Tools:
 - list_character_images(code) -> image content list for the character
 """
 from fastmcp import FastMCP
+from fastmcp.client import Client
+from fastmcp.client.transports import StdioTransport
 from fastmcp.server import create_proxy
 from fastmcp.server.providers.filesystem import FileSystemProvider
 from fastmcp.server.lifespan import lifespan
@@ -137,6 +139,9 @@ def _configure_comfy_proxy(transport: str) -> None:
     global _comfy_provider_added
     if _comfy_provider_added:
         return
+    if config.COMFY_MOUNT_MODE != "mount":
+        LOG.info("Skipping comfy mount mode (COMFY_MOUNT_MODE=%s)", config.COMFY_MOUNT_MODE)
+        return
 
     enable_for_http = bool(config.COMFY_PROXY_IN_HTTP)
     if transport == "http" and not enable_for_http:
@@ -189,6 +194,54 @@ def _configure_comfy_proxy(transport: str) -> None:
         mcp.mount(create_proxy(server_cfg), namespace="comfy")
         _comfy_provider_added = True
         LOG.info("Mounted comfy proxy via uvx auto-spawn: uvx %s", " ".join(args))
+
+
+def _comfy_transport():
+    if config.COMFY_MCP_URL:
+        return config.COMFY_MCP_URL
+    if config.COMFY_MCP_STDIO_COMMAND:
+        args = shlex.split(config.COMFY_MCP_STDIO_ARGS) if config.COMFY_MCP_STDIO_ARGS else []
+        env = dict(os.environ)
+        env.update(config.comfy_stdio_env_map())
+        cwd = config.COMFY_MCP_STDIO_CWD or None
+        return StdioTransport(command=config.COMFY_MCP_STDIO_COMMAND, args=args, env=env, cwd=cwd)
+    if config.COMFY_MCP_AUTO_SPAWN and config.COMFY_MCP_SERVER_SPEC:
+        args = [
+            "--from",
+            config.COMFY_MCP_SERVER_SPEC,
+            config.COMFY_MCP_SERVER_ENTRYPOINT,
+            "--comfy-url",
+            config.COMFYUI_URL,
+            "--output-folder",
+            str(config.COMFY_OUTPUT_DIR),
+        ]
+        if config.COMFY_MCP_SERVER_EXTRA_ARGS:
+            args.extend(shlex.split(config.COMFY_MCP_SERVER_EXTRA_ARGS))
+        return StdioTransport(command="uvx", args=args, env=dict(os.environ))
+    return None
+
+
+async def _call_comfy_tool(name: str, payload: dict) -> dict:
+    transport = _comfy_transport()
+    if transport is None:
+        return {"ok": False, "error": "No comfy transport configured"}
+    try:
+        async with Client(transport) as c:
+            result = await asyncio.wait_for(
+                c.call_tool(name, payload),
+                timeout=config.COMFY_TOOL_TIMEOUT_SECONDS,
+            )
+            data = getattr(result, "data", None)
+            if data is not None:
+                return {"ok": True, "tool": name, "result": data}
+            text = []
+            for item in getattr(result, "content", []) or []:
+                t = getattr(item, "text", None)
+                if t:
+                    text.append(t)
+            return {"ok": True, "tool": name, "result": text}
+    except Exception as ex:
+        return {"ok": False, "tool": name, "error": str(ex)}
 
 
 def _download_yaml_for_code(code: str) -> Path | None:
@@ -662,6 +715,8 @@ def get_runtime_capabilities() -> dict:
         "comfy_mcp_auto_spawn": bool(config.COMFY_MCP_AUTO_SPAWN),
         "comfy_mcp_server_spec": config.COMFY_MCP_SERVER_SPEC or None,
         "comfy_mcp_server_entrypoint": config.COMFY_MCP_SERVER_ENTRYPOINT or None,
+        "comfy_mount_mode": config.COMFY_MOUNT_MODE,
+        "comfy_tool_timeout_seconds": config.COMFY_TOOL_TIMEOUT_SECONDS,
         "comfy_proxy_in_http": bool(config.COMFY_PROXY_IN_HTTP),
         "comfy_output_dir": str(config.COMFY_OUTPUT_DIR),
         "stories_dir": str(config.STORIES_DIR),
@@ -783,6 +838,121 @@ def list_stories() -> dict:
                 }
             )
     return {"count": len(rows), "stories": rows}
+
+
+@mcp.tool
+async def comfy_generate_image(prompt: str) -> dict:
+    return await _call_comfy_tool("generate_image", {"prompt": prompt})
+
+
+@mcp.tool
+async def comfy_flux2_text_to_image(prompt: str, output_filename_prefix: str, width: int, height: int) -> dict:
+    return await _call_comfy_tool(
+        "flux2_text_to_image",
+        {
+            "prompt": prompt,
+            "output_filename_prefix": output_filename_prefix,
+            "width": width,
+            "height": height,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_flux2_single_image_edit(
+    prompt: str,
+    reference_image_filename: str,
+    output_filename_prefix: str,
+    width: int,
+    height: int,
+) -> dict:
+    return await _call_comfy_tool(
+        "flux2_single_image_edit",
+        {
+            "prompt": prompt,
+            "reference_image_filename": reference_image_filename,
+            "output_filename_prefix": output_filename_prefix,
+            "width": width,
+            "height": height,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_flux2_double_image_edit(
+    prompt: str,
+    reference_image_filename_1: str,
+    reference_image_filename_2: str,
+    output_filename_prefix: str,
+    width: int,
+    height: int,
+) -> dict:
+    return await _call_comfy_tool(
+        "flux2_double_image_edit",
+        {
+            "prompt": prompt,
+            "reference_image_filename_1": reference_image_filename_1,
+            "reference_image_filename_2": reference_image_filename_2,
+            "output_filename_prefix": output_filename_prefix,
+            "width": width,
+            "height": height,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_ltx2_singlepass_t2v(
+    prompt: str,
+    output_video_filename_prefix: str,
+    output_lastframe_filename_prefix: str,
+    video_length_seconds: int,
+) -> dict:
+    return await _call_comfy_tool(
+        "ltx2_singlepass_t2v",
+        {
+            "prompt": prompt,
+            "output_video_filename_prefix": output_video_filename_prefix,
+            "output_lastframe_filename_prefix": output_lastframe_filename_prefix,
+            "video_length_seconds": video_length_seconds,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_ltx2_singlepass_i2v(
+    prompt: str,
+    first_frame_image_filename: str,
+    output_video_filename_prefix: str,
+    output_lastframe_filename_prefix: str,
+    video_length_seconds: int,
+) -> dict:
+    return await _call_comfy_tool(
+        "ltx2_singlepass_i2v",
+        {
+            "prompt": prompt,
+            "first_frame_image_filename": first_frame_image_filename,
+            "output_video_filename_prefix": output_video_filename_prefix,
+            "output_lastframe_filename_prefix": output_lastframe_filename_prefix,
+            "video_length_seconds": video_length_seconds,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_qwentts_voice(speech_text: str, voice_instruct: str, output_filename_prefix: str) -> dict:
+    return await _call_comfy_tool(
+        "qwentts_voice",
+        {
+            "speech_text": speech_text,
+            "voice_instruct": voice_instruct,
+            "output_filename_prefix": output_filename_prefix,
+        },
+    )
+
+
+@mcp.tool
+async def comfy_generate_song(tags: str, lyrics: str) -> dict:
+    return await _call_comfy_tool("generate_song", {"tags": tags, "lyrics": lyrics})
 
 
 @mcp.tool
